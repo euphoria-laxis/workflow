@@ -1,0 +1,38 @@
+stateDiagram-v2
+    classDef currentPlace font-weight:bold,stroke-width:4px
+    draft
+    pending_technical_review
+    technical_approved
+    pending_legal_review
+    legal_approved
+    pending_manager_approval
+    pending_director_approval
+    approved
+    rejected
+    archived
+    state submit_for_review_fork <<fork>>
+    draft --> submit_for_review_fork : submit_for_review
+    submit_for_review_fork --> pending_technical_review
+    submit_for_review_fork --> pending_legal_review
+    pending_technical_review --> technical_approved : technical_approve
+    pending_technical_review --> rejected : technical_reject
+    pending_legal_review --> legal_approved : legal_approve
+    pending_legal_review --> rejected : legal_reject
+    state pending_manager_approve_join <<join>>
+    technical_approved --> pending_manager_approve_join : pending_manager_approve
+    legal_approved --> pending_manager_approve_join : pending_manager_approve
+    pending_manager_approve_join --> pending_manager_approval
+    pending_manager_approval --> pending_director_approval : manager_approve
+    pending_manager_approval --> rejected : manager_reject
+    pending_director_approval --> approved : director_approve
+    pending_director_approval --> rejected : director_reject
+    approved --> archived : archive_approved
+    rejected --> archived : archive_rejected
+    approved --> draft : reopen_approved
+    rejected --> draft : reopen_rejected
+
+    %% Current places
+    class archived currentPlace
+
+    %% Initial place
+    [*] --> draft
