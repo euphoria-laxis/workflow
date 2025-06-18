@@ -9,11 +9,11 @@ A flexible and extensible workflow engine for Go applications. This package prov
 - Event system for workflow lifecycle hooks
 - Constraint system for transition validation
 - Thread-safe workflow registry
-- JSON serialization support
 - Comprehensive test coverage
 - Mermaid diagram generation for visualization
 - Flexible storage interface for workflow persistence
 - Workflow manager for lifecycle management
+- Support for parallel transitions and branching
 
 ## Feature Checklist
 
@@ -27,31 +27,30 @@ A flexible and extensible workflow engine for Go applications. This package prov
 - [x] Workflow manager for lifecycle management
 - [x] Storage interface for persistence
 - [x] SQLite storage implementation
+- [x] Support for parallel transitions and branching
+- [x] Workflow history and audit trail (in examples)
+- [x] Web interface for workflow management (in examples)
+- [x] REST API endpoints (in examples)
 
 ### Planned Features 🚀
-- [ ] YAML configuration support
-- [ ] JSON serialization
-- [ ] Web interface for workflow management
-- [ ] REST API endpoints
+
+#### High Priority
+- [ ] YAML/JSON configuration support
+- [ ] Standalone web interface for workflow management
+- [ ] Enhanced REST API endpoints
+- [ ] Workflow validation system
 - [ ] Dynamic workflow definition loading
+
+#### Medium Priority
 - [ ] Custom scripting for transition conditions
 - [ ] Workflow versioning
 - [ ] Workflow templates
-- [ ] Advanced state persistence
-- [ ] Workflow history and audit trail
 - [ ] Role-based access control
-- [ ] Workflow metadata support
-- [ ] Custom marking store implementations
-- [ ] Workflow validation system
-- [ ] Support for parallel transitions
 - [ ] Workflow timeout and scheduling
+
+#### Low Priority
 - [ ] Workflow statistics and analytics
 - [ ] Export/Import workflow definitions
-- [ ] Workflow debugging tools
-- [ ] Support for sub-workflows
-- [ ] Workflow branching and merging
-- [ ] Custom event dispatchers
-- [ ] Workflow documentation generator
 
 ## Installation
 
