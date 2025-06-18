@@ -26,19 +26,29 @@ type marking struct {
 
 // NewMarking creates a new marking instance
 func NewMarking(places []Place) Marking {
+	// Create a copy of the places slice to prevent external modification
+	placesCopy := make([]Place, len(places))
+	copy(placesCopy, places)
+
 	return &marking{
-		places: places,
+		places: placesCopy,
 	}
 }
 
-// Places returns the current places in the marking
+// Places returns a copy of the current places in the marking
 func (m *marking) Places() []Place {
-	return m.places
+	// Return a copy to prevent external modification
+	placesCopy := make([]Place, len(m.places))
+	copy(placesCopy, m.places)
+	return placesCopy
 }
 
 // SetPlaces sets the places in the marking
 func (m *marking) SetPlaces(places []Place) {
-	m.places = places
+	// Create a copy of the places slice to prevent external modification
+	placesCopy := make([]Place, len(places))
+	copy(placesCopy, places)
+	m.places = placesCopy
 }
 
 // HasPlace checks if a place exists
@@ -78,5 +88,19 @@ func (m *marking) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements json.Unmarshaler
 func (m *marking) UnmarshalJSON(data []byte) error {
-	return json.Unmarshal(data, &m.places)
+	var places []Place
+	if err := json.Unmarshal(data, &places); err != nil {
+		return err
+	}
+	m.places = places
+	return nil
+}
+
+// UnmarshalMarkingJSON unmarshals JSON data into a Marking interface
+func UnmarshalMarkingJSON(data []byte) (Marking, error) {
+	var places []Place
+	if err := json.Unmarshal(data, &places); err != nil {
+		return nil, err
+	}
+	return NewMarking(places), nil
 }

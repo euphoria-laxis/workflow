@@ -117,11 +117,10 @@ func TestDefaultMarking_MarshalJSON(t *testing.T) {
 		t.Errorf("MarshalJSON() error = %v", err)
 	}
 
-	// Test unmarshaling
-	var newMarking workflow.Marking
-	err = json.Unmarshal(data, &newMarking)
+	// Test unmarshaling using the helper function
+	newMarking, err := workflow.UnmarshalMarkingJSON(data)
 	if err != nil {
-		t.Errorf("UnmarshalJSON() error = %v", err)
+		t.Errorf("UnmarshalMarkingJSON() error = %v", err)
 	}
 
 	got := newMarking.Places()
@@ -287,17 +286,16 @@ func TestMarking_JSON(t *testing.T) {
 				t.Errorf("MarshalJSON() error = %v", err)
 			}
 
-			// Test unmarshaling
-			var newMarking workflow.Marking
-			err = json.Unmarshal(data, &newMarking)
+			// Test unmarshaling using the helper function
+			newMarking, err := workflow.UnmarshalMarkingJSON(data)
 			if err != nil {
-				t.Errorf("UnmarshalJSON() error = %v", err)
+				t.Errorf("UnmarshalMarkingJSON() error = %v", err)
 			}
 
 			// Compare places
 			got := newMarking.Places()
-			if len(got) != len(tt.places) {
-				t.Errorf("JSON roundtrip count = %v, want %v", len(got), len(tt.places))
+			if !reflect.DeepEqual(got, tt.places) {
+				t.Errorf("JSON roundtrip = %v, want %v", got, tt.places)
 			}
 		})
 	}

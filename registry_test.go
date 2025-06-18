@@ -85,9 +85,11 @@ func TestRegistry_Workflow(t *testing.T) {
 				t.Errorf("Workflow() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
-			name := got.Name()
-			if !tt.wantErr && name != tt.getName {
-				t.Errorf("Workflow() name = %v, want %v", name, tt.getName)
+			if !tt.wantErr && got != nil {
+				name := got.Name()
+				if name != tt.getName {
+					t.Errorf("Workflow() name = %v, want %v", name, tt.getName)
+				}
 			}
 		})
 	}

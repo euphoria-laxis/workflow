@@ -678,10 +678,14 @@ func TestWorkflow_GenerateMermaidDiagram(t *testing.T) {
     branch1
     branch2
     end
-    start --> branch1 : fork
-    start --> branch2 : fork
-    branch1 --> end : merge
-    branch2 --> end : merge
+    state fork_fork <<fork>>
+    start --> fork_fork : fork
+    fork_fork --> branch1
+    fork_fork --> branch2
+    state merge_join <<join>>
+    branch1 --> merge_join : merge
+    branch2 --> merge_join : merge
+    merge_join --> end
 
     %% Current places
     class start currentPlace
