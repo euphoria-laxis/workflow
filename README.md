@@ -247,14 +247,18 @@ fmt.Println(diagram)
 Example output:
 ```mermaid
 stateDiagram-v2
+    classDef currentPlace font-weight:bold,stroke-width:4px
     start
     middle
     end
     start --> middle : to-middle
     middle --> end : to-end
 
-    %% Current states
-    state start as start
+    %% Current places
+    class end currentPlace
+
+    %% Initial place
+    [*] --> start
 ```
 
 ## Benchmarks
