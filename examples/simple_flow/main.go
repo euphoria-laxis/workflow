@@ -36,12 +36,12 @@ func main() {
 
 	// Add event listeners
 	wf.AddEventListener(workflow.EventBeforeTransition, func(event workflow.Event) error {
-		fmt.Printf("Before transition: %s\n", event.Transition().Name)
+		fmt.Printf("Before transition: %s\n", event.Transition().Name())
 		return nil
 	})
 
 	wf.AddEventListener(workflow.EventAfterTransition, func(event workflow.Event) error {
-		fmt.Printf("After transition: %s\n", event.Transition().Name)
+		fmt.Printf("After transition: %s\n", event.Transition().Name())
 		return nil
 	})
 

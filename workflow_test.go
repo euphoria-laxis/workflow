@@ -419,7 +419,7 @@ func TestWorkflow_GetEnabledTransitions(t *testing.T) {
 			for _, want := range tt.wantTransitions {
 				found := false
 				for _, trans := range got {
-					if trans.Name == want {
+					if trans.Name() == want {
 						found = true
 						break
 					}

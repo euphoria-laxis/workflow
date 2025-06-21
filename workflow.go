@@ -100,19 +100,26 @@ func (w *Workflow) Can(to []Place) error {
 
 	// Check if any enabled transition leads to the target places
 	for _, t := range enabled {
-		if len(t.To) == len(to) {
+		if len(t.To()) == len(to) {
 			matches := true
-			for i := range t.To {
-				if t.To[i] != to[i] {
+			for i := range t.To() {
+				if t.To()[i] != to[i] {
 					matches = false
 					break
 				}
 			}
 			if matches {
-				// Fire guard event
+				// Create guard event for validation
 				event := NewGuardEvent(&t, w.marking.Places(), to, w, w.context)
+
+				// First, validate transition constraints
+				if err = t.validate(event); err != nil {
+					return err
+				}
+
+				// Then, fire guard event listeners
 				for _, listener := range w.listeners[EventGuard] {
-					if err := listener.(GuardEventListener)(event); err != nil {
+					if err = listener.(GuardEventListener)(event); err != nil {
 						return err
 					}
 					if event.IsBlocking() {
@@ -150,7 +157,7 @@ func (w *Workflow) Apply(targetPlaces []Place) error {
 	for _, t := range w.definition.Transitions {
 		// Check if all 'from' places are in current places
 		allFromPlacesPresent := true
-		for _, fromPlace := range t.From {
+		for _, fromPlace := range t.From() {
 			found := false
 			for _, place := range currentPlaces {
 				if place == fromPlace {
@@ -165,16 +172,16 @@ func (w *Workflow) Apply(targetPlaces []Place) error {
 		}
 
 		// Check if all 'to' places match
-		if allFromPlacesPresent && len(t.To) == len(targetPlaces) {
+		if allFromPlacesPresent && len(t.To()) == len(targetPlaces) {
 			matches := true
-			for i := range t.To {
-				if t.To[i] != targetPlaces[i] {
+			for i := range t.To() {
+				if t.To()[i] != targetPlaces[i] {
 					matches = false
 					break
 				}
 			}
 			if matches {
-				from = t.From
+				from = t.From()
 				transition = &t
 				break
 			}
@@ -232,7 +239,7 @@ func (w *Workflow) EnabledTransitions() ([]Transition, error) {
 	for _, trans := range w.definition.Transitions {
 		// Check if all 'from' places are in current places
 		allFromPlacesPresent := true
-		for _, fromPlace := range trans.From {
+		for _, fromPlace := range trans.From() {
 			found := false
 			for _, place := range currentPlaces {
 				if place == fromPlace {

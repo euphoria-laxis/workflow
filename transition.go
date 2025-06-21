@@ -6,11 +6,11 @@ import (
 
 // Transition represents a transition between places in the workflow
 type Transition struct {
-	Name        string
-	From        []Place
-	To          []Place
-	Metadata    map[string]interface{}
-	Constraints []Constraint
+	name        string
+	from        []Place
+	to          []Place
+	metadata    map[string]interface{}
+	constraints []Constraint
 }
 
 // Constraint represents a validation constraint for a transition
@@ -51,33 +51,54 @@ func NewTransition(name string, from []Place, to []Place) (*Transition, error) {
 	}
 
 	return &Transition{
-		Name:        name,
-		From:        from,
-		To:          to,
-		Metadata:    make(map[string]interface{}),
-		Constraints: make([]Constraint, 0),
+		name:        name,
+		from:        from,
+		to:          to,
+		metadata:    make(map[string]interface{}),
+		constraints: make([]Constraint, 0),
 	}, nil
+}
+
+// Name returns the transition name
+func (t *Transition) Name() string {
+	return t.name
+}
+
+// From returns the source places of the transition
+func (t *Transition) From() []Place {
+	// Return a copy to prevent external modification
+	fromCopy := make([]Place, len(t.from))
+	copy(fromCopy, t.from)
+	return fromCopy
+}
+
+// To returns the target places of the transition
+func (t *Transition) To() []Place {
+	// Return a copy to prevent external modification
+	toCopy := make([]Place, len(t.to))
+	copy(toCopy, t.to)
+	return toCopy
 }
 
 // AddConstraint adds a constraint to the transition
 func (t *Transition) AddConstraint(constraint Constraint) {
-	t.Constraints = append(t.Constraints, constraint)
+	t.constraints = append(t.constraints, constraint)
 }
 
 // SetMetadata sets metadata for the transition
 func (t *Transition) SetMetadata(key string, value interface{}) {
-	t.Metadata[key] = value
+	t.metadata[key] = value
 }
 
-// GetMetadataValue returns the value for the given key from the transition metadata
-func (t *Transition) GetMetadataValue(key string) (interface{}, bool) {
-	value, ok := t.Metadata[key]
+// Metadata returns the value for the given key from the transition metadata
+func (t *Transition) Metadata(key string) (interface{}, bool) {
+	value, ok := t.metadata[key]
 	return value, ok
 }
 
-// Validate validates the transition against all constraints
-func (t *Transition) Validate(event Event) error {
-	for _, constraint := range t.Constraints {
+// validate validates the transition against all constraints (internal method)
+func (t *Transition) validate(event Event) error {
+	for _, constraint := range t.constraints {
 		if err := constraint.Validate(event); err != nil {
 			return err
 		}
