@@ -1,9 +1,5 @@
 stateDiagram-v2
     classDef currentPlace font-weight:bold,stroke-width:4px
-    classDef errorState fill:#ffcccc
-    classDef successState fill:#ccffcc
-    classDef processingState fill:#ffffcc
-
     pending
     payment_processing
     payment_approved
@@ -14,39 +10,22 @@ stateDiagram-v2
     delivered
     cancelled
     refunded
-
-    %% Initial state
-    [*] --> pending
-
-    %% Payment flow
     pending --> payment_processing : process_payment
     payment_processing --> payment_approved : payment_success
     payment_processing --> payment_failed : payment_failure
     payment_failed --> payment_processing : retry_payment
-
-    %% Inventory flow
     payment_approved --> inventory_check : check_inventory
     inventory_check --> shipping : inventory_available
     inventory_check --> inventory_insufficient : inventory_insufficient
     inventory_insufficient --> shipping : restock_and_ship
-
-    %% Delivery flow
     shipping --> delivered : mark_delivered
-    delivered --> refunded : refund_order
-
-    %% Cancellation paths
     pending --> cancelled : cancel_pending
     payment_processing --> cancelled : cancel_payment_processing
     payment_approved --> cancelled : cancel_payment_approved
+    delivered --> refunded : refund_order
 
-    %% State styling
-    class pending processingState
-    class payment_processing processingState
-    class payment_approved successState
-    class payment_failed errorState
-    class inventory_check processingState
-    class inventory_insufficient errorState
-    class shipping processingState
-    class delivered successState
-    class cancelled errorState
-    class refunded errorState 
+    %% Current places
+    class delivered currentPlace
+
+    %% Initial place
+    [*] --> pending
