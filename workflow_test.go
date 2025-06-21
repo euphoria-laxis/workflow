@@ -605,7 +605,7 @@ func TestWorkflow_ForkAndMerge(t *testing.T) {
 	}
 }
 
-func TestWorkflow_GenerateMermaidDiagram(t *testing.T) {
+func TestWorkflow_Diagram(t *testing.T) {
 	tests := []struct {
 		name         string
 		definition   func() (*workflow.Definition, error)
@@ -707,9 +707,9 @@ func TestWorkflow_GenerateMermaidDiagram(t *testing.T) {
 				t.Fatalf("failed to create workflow: %v", err)
 			}
 
-			got := wf.GenerateMermaidDiagram()
+			got := wf.Diagram()
 			if got != tt.want {
-				t.Errorf("GenerateMermaidDiagram() = %v, want %v", got, tt.want)
+				t.Errorf("Diagram() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -169,7 +169,7 @@ func handleDiagram(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to create template workflow", http.StatusInternalServerError)
 		return
 	}
-	diagram := templateWorkflow.GenerateMermaidDiagram()
+	diagram := templateWorkflow.Diagram()
 	templates.ExecuteTemplate(w, "diagram.html", diagram)
 }
 

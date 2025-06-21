@@ -230,7 +230,7 @@ func main() {
 	// Generate and display workflow diagram
 	fmt.Println("\n📋 Workflow Diagram:")
 	fmt.Println("===================")
-	diagram := wf.GenerateMermaidDiagram()
+	diagram := wf.Diagram()
 	fmt.Println(diagram)
 
 	// Demonstrate transition history

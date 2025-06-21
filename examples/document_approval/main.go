@@ -197,7 +197,7 @@ func main() {
 
 	// Print the final workflow diagram
 	fmt.Println("\nWorkflow Diagram:")
-	fmt.Println(wf.GenerateMermaidDiagram())
+	fmt.Println(wf.Diagram())
 }
 
 func createTransition(name string, from, to []workflow.Place) *workflow.Transition {

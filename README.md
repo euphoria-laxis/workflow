@@ -112,7 +112,7 @@ func main() {
     fmt.Printf("Current states: %v\n", states)
 
     // Generate and print the workflow diagram
-    diagram := wf.GenerateMermaidDiagram()
+    diagram := wf.Diagram()
     fmt.Println(diagram)
 }
 ```
@@ -276,7 +276,7 @@ The package includes a Mermaid diagram generator for visualizing workflows. The 
 
 ```go
 // Generate a Mermaid diagram
-diagram := wf.GenerateMermaidDiagram()
+diagram := wf.Diagram()
 fmt.Println(diagram)
 ```
 

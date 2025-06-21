@@ -58,5 +58,5 @@ func main() {
 
 	// Print the workflow diagram
 	fmt.Println("\nWorkflow Diagram:")
-	fmt.Println(wf.GenerateMermaidDiagram())
+	fmt.Println(wf.Diagram())
 }

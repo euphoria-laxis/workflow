@@ -5,8 +5,8 @@ import (
 	"strings"
 )
 
-// GenerateMermaidDiagram generates a Mermaid state diagram for the workflow
-func (w *Workflow) GenerateMermaidDiagram() string {
+// Diagram generates a Mermaid state diagram for the workflow
+func (w *Workflow) Diagram() string {
 	var diagram strings.Builder
 	diagram.WriteString("stateDiagram-v2\n")
 	diagram.WriteString("    classDef currentPlace font-weight:bold,stroke-width:4px\n")
