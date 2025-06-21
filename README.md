@@ -196,7 +196,7 @@ tr.AddConstraint(&MyConstraint{})
 
 ### Using the Registry
 
-The registry allows you to manage multiple workflows:
+The registry allows you to manage multiple workflows and is **thread-safe** for concurrent access:
 
 ```go
 registry := workflow.NewRegistry()
@@ -210,11 +210,47 @@ wf, err := registry.Workflow("my-workflow")
 // List all workflows
 names := registry.ListWorkflows()
 
-// Get context value
-value, ok := wf.Context("key")
-if ok {
-    fmt.Printf("Context value: %v\n", value)
-}
+// Check if workflow exists
+exists := registry.HasWorkflow("my-workflow")
+
+// Remove a workflow
+err = registry.RemoveWorkflow("my-workflow")
+```
+
+**Thread Safety**: The Registry is designed for concurrent access:
+- ✅ **Read operations** (`Workflow`, `ListWorkflows`, `HasWorkflow`) use read locks for optimal performance
+- ✅ **Write operations** (`AddWorkflow`, `RemoveWorkflow`) use write locks for data consistency
+- ✅ **Concurrent reads and writes** are properly synchronized
+- ✅ **Race condition free** - all operations are atomic
+
+Example of concurrent usage:
+```go
+registry := workflow.NewRegistry()
+
+// Multiple goroutines can safely access the registry
+go func() {
+    for i := 0; i < 100; i++ {
+        wf := createWorkflow(fmt.Sprintf("workflow-%d", i))
+        registry.AddWorkflow(wf)
+    }
+}()
+
+go func() {
+    for i := 0; i < 100; i++ {
+        name := fmt.Sprintf("workflow-%d", i)
+        wf, err := registry.Workflow(name)
+        if err == nil {
+            // Process workflow
+        }
+    }
+}()
+
+go func() {
+    for i := 0; i < 100; i++ {
+        names := registry.ListWorkflows()
+        // Process workflow list
+    }
+}()
 ```
 
 ### Event Types
@@ -231,7 +267,7 @@ You can attach context data to workflows:
 
 ```go
 wf.SetContext("key", "value")
-value, ok := wf.GetContext("key")
+value, ok := wf.Context("key")
 ```
 
 ### Workflow Visualization

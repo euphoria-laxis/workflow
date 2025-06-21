@@ -1,6 +1,8 @@
 package workflow_test
 
 import (
+	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/ehabterra/workflow"
@@ -241,6 +243,102 @@ func TestRegistry_HasWorkflow(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRegistry_ConcurrentAccess(t *testing.T) {
+	registry := workflow.NewRegistry()
+
+	// Add some initial workflows
+	for i := 0; i < 5; i++ {
+		wf := createTestWorkflow(t, fmt.Sprintf("workflow-%d", i))
+		err := registry.AddWorkflow(wf)
+		if err != nil {
+			t.Fatalf("failed to add workflow: %v", err)
+		}
+	}
+
+	// Test concurrent reads
+	t.Run("concurrent reads", func(t *testing.T) {
+		const numGoroutines = 10
+		const numReads = 100
+
+		var wg sync.WaitGroup
+		for i := 0; i < numGoroutines; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for j := 0; j < numReads; j++ {
+					// Random workflow name
+					name := fmt.Sprintf("workflow-%d", j%5)
+					_, err := registry.Workflow(name)
+					if err != nil && j < 5 { // First 5 should exist
+						t.Errorf("unexpected error reading workflow %s: %v", name, err)
+					}
+
+					// Test HasWorkflow
+					exists := registry.HasWorkflow(name)
+					if j < 5 && !exists {
+						t.Errorf("workflow %s should exist", name)
+					}
+
+					// Test ListWorkflows
+					list := registry.ListWorkflows()
+					if len(list) != 5 {
+						t.Errorf("expected 5 workflows, got %d", len(list))
+					}
+				}
+			}()
+		}
+		wg.Wait()
+	})
+
+	// Test concurrent reads and writes
+	t.Run("concurrent reads and writes", func(t *testing.T) {
+		const numReaders = 5
+		const numWriters = 3
+		const numOperations = 50
+
+		var wg sync.WaitGroup
+
+		// Start readers
+		for i := 0; i < numReaders; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for j := 0; j < numOperations; j++ {
+					name := fmt.Sprintf("workflow-%d", j%5)
+					registry.Workflow(name)
+					registry.HasWorkflow(name)
+					registry.ListWorkflows()
+				}
+			}()
+		}
+
+		// Start writers
+		for i := 0; i < numWriters; i++ {
+			wg.Add(1)
+			go func(writerID int) {
+				defer wg.Done()
+				for j := 0; j < numOperations; j++ {
+					// Add new workflow
+					name := fmt.Sprintf("concurrent-workflow-%d-%d", writerID, j)
+					wf := createTestWorkflow(t, name)
+					registry.AddWorkflow(wf)
+
+					// Remove it
+					registry.RemoveWorkflow(name)
+				}
+			}(i)
+		}
+
+		wg.Wait()
+
+		// Verify final state
+		list := registry.ListWorkflows()
+		if len(list) != 5 {
+			t.Errorf("expected 5 workflows after concurrent operations, got %d", len(list))
+		}
+	})
 }
 
 // Helper function to create a test workflow

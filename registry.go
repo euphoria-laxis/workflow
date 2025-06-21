@@ -38,6 +38,9 @@ func (r *Registry) AddWorkflow(wf *Workflow) error {
 
 // Workflow returns a workflow by name
 func (r *Registry) Workflow(name string) (*Workflow, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	if wf, ok := r.workflows[name]; ok {
 		return wf, nil
 	}
