@@ -18,18 +18,19 @@ func NewDefinition(places []Place, transitions []Transition) (*Definition, error
 		validPlaces[place] = true
 	}
 
-	// Validate that all places in transitions exist in places
+	// Validate all transitions
 	for _, trans := range transitions {
-		// Validate 'from' places
-		for _, place := range trans.From {
+		// Check 'from' places
+		for _, place := range trans.From() {
 			if !validPlaces[place] {
-				return nil, fmt.Errorf("place '%s' in transition '%s' is not defined in workflow places", place, trans.Name)
+				return nil, fmt.Errorf("place '%s' in transition '%s' is not defined in workflow places", place, trans.Name())
 			}
 		}
-		// Validate 'to' places
-		for _, place := range trans.To {
+
+		// Check 'to' places
+		for _, place := range trans.To() {
 			if !validPlaces[place] {
-				return nil, fmt.Errorf("place '%s' in transition '%s' is not defined in workflow places", place, trans.Name)
+				return nil, fmt.Errorf("place '%s' in transition '%s' is not defined in workflow places", place, trans.Name())
 			}
 		}
 	}
@@ -57,7 +58,7 @@ func (d *Definition) AllTransitions() []Transition {
 // Transition returns a transition by name
 func (d *Definition) Transition(name string) *Transition {
 	for _, t := range d.Transitions {
-		if t.Name == name {
+		if t.Name() == name {
 			return &t
 		}
 	}

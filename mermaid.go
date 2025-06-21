@@ -19,36 +19,36 @@ func (w *Workflow) GenerateMermaidDiagram() string {
 	// Add all transitions
 	for _, trans := range w.definition.Transitions {
 		// Handle multiple to places
-		if len(trans.To) > 1 {
+		if len(trans.To()) > 1 {
 			// This is a fork
-			forkState := fmt.Sprintf("%s_fork", trans.Name)
+			forkState := fmt.Sprintf("%s_fork", trans.Name())
 			diagram.WriteString(fmt.Sprintf("    state %s <<fork>>\n", forkState))
-			if len(trans.From) > 1 {
+			if len(trans.From()) > 1 {
 				// This is a join
-				joinState := fmt.Sprintf("%s_join", trans.Name)
+				joinState := fmt.Sprintf("%s_join", trans.Name())
 				diagram.WriteString(fmt.Sprintf("    state %s <<join>>\n", joinState))
-				for _, from := range trans.From {
-					diagram.WriteString(fmt.Sprintf("    %s --> %s : %s\n", from, joinState, trans.Name))
+				for _, from := range trans.From() {
+					diagram.WriteString(fmt.Sprintf("    %s --> %s : %s\n", from, joinState, trans.Name()))
 				}
 				diagram.WriteString(fmt.Sprintf("    %s --> %s\n", joinState, forkState))
 			} else {
-				diagram.WriteString(fmt.Sprintf("    %s --> %s : %s\n", trans.From[0], forkState, trans.Name))
+				diagram.WriteString(fmt.Sprintf("    %s --> %s : %s\n", trans.From()[0], forkState, trans.Name()))
 			}
-			for _, to := range trans.To {
+			for _, to := range trans.To() {
 				diagram.WriteString(fmt.Sprintf("    %s --> %s\n", forkState, to))
 			}
 		} else {
-			if len(trans.From) > 1 {
+			if len(trans.From()) > 1 {
 				// This is a join
-				joinState := fmt.Sprintf("%s_join", trans.Name)
+				joinState := fmt.Sprintf("%s_join", trans.Name())
 				diagram.WriteString(fmt.Sprintf("    state %s <<join>>\n", joinState))
-				for _, from := range trans.From {
-					diagram.WriteString(fmt.Sprintf("    %s --> %s : %s\n", from, joinState, trans.Name))
+				for _, from := range trans.From() {
+					diagram.WriteString(fmt.Sprintf("    %s --> %s : %s\n", from, joinState, trans.Name()))
 				}
-				diagram.WriteString(fmt.Sprintf("    %s --> %s\n", joinState, trans.To[0]))
+				diagram.WriteString(fmt.Sprintf("    %s --> %s\n", joinState, trans.To()[0]))
 			} else {
 				// Regular transition
-				diagram.WriteString(fmt.Sprintf("    %s --> %s : %s\n", trans.From[0], trans.To[0], trans.Name))
+				diagram.WriteString(fmt.Sprintf("    %s --> %s : %s\n", trans.From()[0], trans.To()[0], trans.Name()))
 			}
 		}
 	}

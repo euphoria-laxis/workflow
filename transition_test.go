@@ -76,7 +76,7 @@ func TestTransition_Metadata(t *testing.T) {
 
 	// Test setting metadata
 	tr.SetMetadata("key", "value")
-	value, ok := tr.GetMetadataValue("key")
+	value, ok := tr.Metadata("key")
 	if !ok {
 		t.Error("metadata value not found")
 	}
@@ -85,34 +85,49 @@ func TestTransition_Metadata(t *testing.T) {
 	}
 
 	// Test getting non-existent metadata
-	_, ok = tr.GetMetadataValue("non-existent")
+	_, ok = tr.Metadata("non-existent")
 	if ok {
 		t.Error("non-existent metadata value found")
 	}
 }
 
 func TestTransition_Constraints(t *testing.T) {
+	// Create a test constraint
+	testConstraint := &testConstraint{shouldFail: false}
+
 	tr, err := workflow.NewTransition("test", []workflow.Place{"start"}, []workflow.Place{"end"})
 	if err != nil {
 		t.Fatalf("failed to create transition: %v", err)
 	}
-
-	// Create a test constraint
-	testConstraint := &testConstraint{shouldFail: false}
 	tr.AddConstraint(testConstraint)
 
-	// Test validation with passing constraint
-	event := workflow.NewGuardEvent(tr, []workflow.Place{"start"}, []workflow.Place{"end"}, nil, nil)
-	err = tr.Validate(event)
+	// Create a definition and workflow
+	def, err := workflow.NewDefinition([]workflow.Place{"start", "end"}, []workflow.Transition{*tr})
 	if err != nil {
-		t.Errorf("Validate() error = %v, want nil", err)
+		t.Fatalf("failed to create definition: %v", err)
+	}
+	wf, err := workflow.NewWorkflow("test", def, "start")
+	if err != nil {
+		t.Fatalf("failed to create workflow: %v", err)
+	}
+
+	// Test validation with passing constraint
+	err = wf.Apply([]workflow.Place{"end"})
+	if err != nil {
+		t.Errorf("Apply() error = %v, want nil", err)
+	}
+
+	// Reset workflow to start
+	wf, err = workflow.NewWorkflow("test", def, "start")
+	if err != nil {
+		t.Fatalf("failed to create workflow: %v", err)
 	}
 
 	// Test validation with failing constraint
 	testConstraint.shouldFail = true
-	err = tr.Validate(event)
+	err = wf.Apply([]workflow.Place{"end"})
 	if err == nil {
-		t.Error("Validate() error = nil, want error")
+		t.Error("Apply() error = nil, want error")
 	}
 }
 
