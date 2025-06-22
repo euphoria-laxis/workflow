@@ -1,6 +1,7 @@
 package workflow_test
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -165,7 +166,7 @@ func TestWorkflow_Can(t *testing.T) {
 				t.Fatalf("failed to create definition: %v", err)
 			}
 			wf, _ := workflow.NewWorkflow("test", definition, tt.initialPlace)
-			err = wf.Can(tt.to)
+			err = wf.CanWithContext(context.Background(), tt.to)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Workflow.Can() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -280,7 +281,7 @@ func TestWorkflow_Apply(t *testing.T) {
 			}
 			wf, _ := workflow.NewWorkflow("test", def, tt.initialPlace)
 
-			err = wf.Apply(tt.targetPlaces)
+			err = wf.ApplyWithContext(context.Background(), tt.targetPlaces)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Workflow.Apply() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -395,7 +396,7 @@ func TestWorkflow_GetEnabledTransitions(t *testing.T) {
 			wf, _ := workflow.NewWorkflow("test", definition, tt.initialPlace)
 
 			for _, trans := range tt.transitions {
-				err := wf.Apply(trans.to)
+				err := wf.ApplyWithContext(context.Background(), trans.to)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("Workflow.Apply() error = %v, wantErr %v", err, tt.wantErr)
 					return
@@ -462,7 +463,7 @@ func TestWorkflow_Events(t *testing.T) {
 		return nil
 	})
 
-	err = wf.Apply([]workflow.Place{"end"})
+	err = wf.ApplyWithContext(context.Background(), []workflow.Place{"end"})
 	if err != nil {
 		t.Errorf("Workflow.Apply() error = %v", err)
 	}
@@ -586,7 +587,7 @@ func TestWorkflow_ForkAndMerge(t *testing.T) {
 			wf, _ := workflow.NewWorkflow("test", def, tt.initialPlace)
 
 			for _, trans := range tt.transitions {
-				err := wf.Apply(trans.to)
+				err := wf.ApplyWithContext(context.Background(), trans.to)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("Workflow.Apply() error = %v, wantErr %v", err, tt.wantErr)
 					return

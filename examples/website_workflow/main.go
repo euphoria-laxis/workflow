@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -39,12 +40,18 @@ type TransitionHistory struct {
 	CreatedAt  time.Time `json:"created_at"`
 }
 
+// Define a custom type for context keys
+type contextKey string
+
+const notesKey contextKey = "notes"
+
 var (
-	db          *sql.DB
-	workflowReg *workflow.Registry
-	workflowDef *workflow.Definition
-	templates   *template.Template
-	workflowMgr *workflow.Manager
+	db           *sql.DB
+	websiteStore *WebsiteStorage
+	workflowReg  *workflow.Registry
+	workflowDef  *workflow.Definition
+	templates    *template.Template
+	workflowMgr  *workflow.Manager
 )
 
 func init() {
@@ -55,28 +62,9 @@ func init() {
 		log.Fatal(err)
 	}
 
-	// Create tables
-	_, err = db.Exec(`
-		CREATE TABLE IF NOT EXISTS website_workflows (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			title TEXT NOT NULL,
-			description TEXT,
-			state TEXT NOT NULL,
-			notes TEXT,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-		);
-
-		CREATE TABLE IF NOT EXISTS transition_history (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			workflow_id INTEGER NOT NULL,
-			from_state TEXT NOT NULL,
-			to_state TEXT NOT NULL,
-			transition TEXT NOT NULL,
-			notes TEXT,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			FOREIGN KEY (workflow_id) REFERENCES website_workflows(id)
-		);
-	`)
+	// Initialize WebsiteStorage
+	websiteStore = NewWebsiteStorage(db)
+	err = websiteStore.Initialize()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -98,6 +86,31 @@ func init() {
 	// Initialize workflow manager with SQLite storage
 	sqliteStorage := storage.NewSQLiteStorage(db)
 	workflowMgr = workflow.NewManager(workflowReg, sqliteStorage)
+	workflowMgr.AddEventListener(workflow.EventAfterTransition, func(e workflow.Event) error {
+		parts := strings.Split(e.Workflow().Name(), "_")
+		idStr := parts[len(parts)-1] // Last part
+		id, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			log.Println("Invalid workflow ID", err)
+			return nil
+		}
+
+		notesVal := e.Context().Value(notesKey)
+		notesStr, _ := notesVal.(string)
+		history := &TransitionHistory{
+			WorkflowID: id,
+			FromState:  fmt.Sprintf("%v", e.From()),
+			ToState:    fmt.Sprintf("%v", e.To()),
+			Transition: e.Transition().Name(),
+			Notes:      notesStr,
+		}
+		if err := websiteStore.AddTransitionHistory(history); err != nil {
+			log.Println(err)
+			return err
+		}
+
+		return nil
+	})
 
 	// Load templates
 	templates = template.Must(template.ParseGlob("templates/*.html"))
@@ -129,21 +142,10 @@ func handleHome(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var workflows []WebsiteWorkflow
-	rows, err := db.Query("SELECT id, title, description, state, notes FROM website_workflows")
+	workflows, err := websiteStore.ListWorkflows()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var wf WebsiteWorkflow
-		if err := rows.Scan(&wf.ID, &wf.Title, &wf.Description, &wf.State, &wf.Notes); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		workflows = append(workflows, wf)
 	}
 
 	templates.ExecuteTemplate(w, "home.html", workflows)
@@ -151,14 +153,16 @@ func handleHome(w http.ResponseWriter, r *http.Request) {
 
 func handleWorkflowPage(w http.ResponseWriter, r *http.Request) {
 	id := filepath.Base(r.URL.Path)
-	var wf WebsiteWorkflow
-	err := db.QueryRow("SELECT id, title, description, state, notes FROM website_workflows WHERE id = ?", id).
-		Scan(&wf.ID, &wf.Title, &wf.Description, &wf.State, &wf.Notes)
+	idInt, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid workflow ID", http.StatusBadRequest)
+		return
+	}
+	wf, err := websiteStore.GetWorkflow(idInt)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
 	templates.ExecuteTemplate(w, "workflow.html", wf)
 }
 
@@ -176,23 +180,11 @@ func handleDiagram(w http.ResponseWriter, r *http.Request) {
 func handleWorkflows(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
-		var workflows []WebsiteWorkflow
-		rows, err := db.Query("SELECT id, title, description, state, notes FROM website_workflows")
+		workflows, err := websiteStore.ListWorkflows()
 		if err != nil {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		defer rows.Close()
-
-		for rows.Next() {
-			var wf WebsiteWorkflow
-			if err := rows.Scan(&wf.ID, &wf.Title, &wf.Description, &wf.State, &wf.Notes); err != nil {
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-				return
-			}
-			workflows = append(workflows, wf)
-		}
-
 		json.NewEncoder(w).Encode(workflows)
 
 	case "POST":
@@ -201,42 +193,20 @@ func handleWorkflows(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
-
-		// Validate input
 		if wf.Title == "" {
 			http.Error(w, "Title is required", http.StatusBadRequest)
 			return
 		}
-
-		// Use prepared statement
-		stmt, err := db.Prepare(`
-			INSERT INTO website_workflows 
-			(title, description, state, notes) 
-			VALUES (?, ?, ?, ?)
-		`)
-		if err != nil {
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-		defer stmt.Close()
-
-		result, err := stmt.Exec(wf.Title, wf.Description, "draft", wf.Notes)
-		if err != nil {
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-
-		id, _ := result.LastInsertId()
-		wf.ID = id
 		wf.State = "draft"
-
-		// Create new workflow instance
-		_, err = workflowMgr.CreateWorkflow(fmt.Sprintf("website_approval_%d", id), workflowDef, workflow.Place("draft"))
+		if err := websiteStore.CreateWorkflow(&wf); err != nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		_, err := workflowMgr.CreateWorkflow(fmt.Sprintf("website_approval_%d", wf.ID), workflowDef, workflow.Place("draft"))
 		if err != nil {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-
 		json.NewEncoder(w).Encode(wf)
 	}
 }
@@ -266,26 +236,19 @@ func handleWorkflow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	idStr := parts[2] // /api/workflows/{id}
-
-	// Convert string ID to int64
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
 		http.Error(w, "Invalid workflow ID", http.StatusBadRequest)
 		return
 	}
-
-	// Get the workflow instance
 	workflowInstance, err := workflowMgr.GetWorkflow(fmt.Sprintf("website_approval_%d", id), workflowDef)
 	if err != nil {
 		http.Error(w, "Workflow not found", http.StatusNotFound)
 		return
 	}
-
 	switch r.Method {
 	case "GET":
-		var wf WebsiteWorkflow
-		err := db.QueryRow("SELECT id, title, description, state, notes FROM website_workflows WHERE id = ?", id).
-			Scan(&wf.ID, &wf.Title, &wf.Description, &wf.State, &wf.Notes)
+		wf, err := websiteStore.GetWorkflow(id)
 		if err != nil {
 			if err == sql.ErrNoRows {
 				http.Error(w, "Workflow not found", http.StatusNotFound)
@@ -295,36 +258,22 @@ func handleWorkflow(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		json.NewEncoder(w).Encode(wf)
-
 	case "PUT":
 		var wf WebsiteWorkflow
 		if err := json.NewDecoder(r.Body).Decode(&wf); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
-
-		// Validate input
 		if wf.Title == "" {
 			http.Error(w, "Title is required", http.StatusBadRequest)
 			return
 		}
-
-		// Use prepared statement to prevent SQL injection
-		stmt, err := db.Prepare("UPDATE website_workflows SET title = ?, description = ?, notes = ? WHERE id = ?")
-		if err != nil {
+		wf.ID = id
+		if err := websiteStore.UpdateWorkflow(&wf); err != nil {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		defer stmt.Close()
-
-		_, err = stmt.Exec(wf.Title, wf.Description, wf.Notes, id)
-		if err != nil {
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-
 		json.NewEncoder(w).Encode(wf)
-
 	case "POST":
 		var transition struct {
 			Transition string `json:"transition"`
@@ -334,16 +283,11 @@ func handleWorkflow(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
-
-		// Validate transition input
 		if transition.Transition == "" {
 			http.Error(w, "Transition is required", http.StatusBadRequest)
 			return
 		}
-
-		var wf WebsiteWorkflow
-		err := db.QueryRow("SELECT id, title, description, state, notes FROM website_workflows WHERE id = ?", id).
-			Scan(&wf.ID, &wf.Title, &wf.Description, &wf.State, &wf.Notes)
+		wf, err := websiteStore.GetWorkflow(id)
 		if err != nil {
 			if err == sql.ErrNoRows {
 				http.Error(w, "Workflow not found", http.StatusNotFound)
@@ -352,44 +296,20 @@ func handleWorkflow(w http.ResponseWriter, r *http.Request) {
 			}
 			return
 		}
-
-		// Store the current state before transition
-		fromState := wf.State
 		targetState := transition.Transition
 
-		// Apply the transition using the workflow instance
-		if err := workflowInstance.Apply([]workflow.Place{workflow.Place(targetState)}); err != nil {
+		ctx := context.WithValue(context.Background(), notesKey, transition.Notes)
+		if err := workflowInstance.ApplyWithContext(ctx, []workflow.Place{workflow.Place(targetState)}); err != nil {
 			http.Error(w, "Transition failed: "+err.Error(), http.StatusBadRequest)
 			return
 		}
-
-		// Save the new state
 		if err := workflowMgr.SaveWorkflow(fmt.Sprintf("website_approval_%d", id), workflowInstance); err != nil {
 			http.Error(w, "Failed to save workflow state", http.StatusInternalServerError)
 			return
 		}
 
-		// Record transition in history
-		historyStmt, err := db.Prepare(`
-			INSERT INTO transition_history 
-			(workflow_id, from_state, to_state, transition, notes) 
-			VALUES (?, ?, ?, ?, ?)
-		`)
-		if err != nil {
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-		defer historyStmt.Close()
-
-		_, err = historyStmt.Exec(id, fromState, targetState, targetState, transition.Notes)
-		if err != nil {
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-
 		wf.State = targetState
 		json.NewEncoder(w).Encode(wf)
-
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -400,35 +320,21 @@ func handleTransitionHistory(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 	if len(parts) < 4 || parts[3] != "history" {
 		http.Error(w, "Invalid URL path", http.StatusBadRequest)
 		return
 	}
 	id := parts[2] // /api/workflows/{id}/history
-
-	var history []TransitionHistory
-	rows, err := db.Query(`
-		SELECT id, workflow_id, from_state, to_state, transition, notes, created_at 
-		FROM transition_history 
-		WHERE workflow_id = ? 
-		ORDER BY created_at DESC
-	`, id)
+	idInt, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid workflow ID", http.StatusBadRequest)
+		return
+	}
+	history, err := websiteStore.ListTransitionHistory(idInt)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var h TransitionHistory
-		if err := rows.Scan(&h.ID, &h.WorkflowID, &h.FromState, &h.ToState, &h.Transition, &h.Notes, &h.CreatedAt); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		history = append(history, h)
-	}
-
 	json.NewEncoder(w).Encode(history)
 }

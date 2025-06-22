@@ -8,6 +8,9 @@ import (
 type Definition struct {
 	Places      []Place
 	Transitions []Transition
+
+	// Default listeners for this workflow type
+	Listeners map[EventType][]interface{}
 }
 
 // NewDefinition creates a new workflow definition
@@ -73,4 +76,34 @@ func (d *Definition) Place(place Place) bool {
 		}
 	}
 	return false
+}
+
+// AddEventListener adds a default event listener for a specific event type
+func (d *Definition) AddEventListener(eventType EventType, listener EventListener) {
+	if d.Listeners == nil {
+		d.Listeners = make(map[EventType][]interface{})
+	}
+	d.Listeners[eventType] = append(d.Listeners[eventType], listener)
+}
+
+// AddGuardEventListener adds a default guard event listener
+func (d *Definition) AddGuardEventListener(listener GuardEventListener) {
+	if d.Listeners == nil {
+		d.Listeners = make(map[EventType][]interface{})
+	}
+	d.Listeners[EventGuard] = append(d.Listeners[EventGuard], listener)
+}
+
+// RemoveEventListener removes a default event listener
+func (d *Definition) RemoveEventListener(eventType EventType, listener interface{}) {
+	if d.Listeners == nil {
+		return
+	}
+	listeners := d.Listeners[eventType]
+	for i, l := range listeners {
+		if &l == &listener {
+			d.Listeners[eventType] = append(listeners[:i], listeners[i+1:]...)
+			break
+		}
+	}
 }

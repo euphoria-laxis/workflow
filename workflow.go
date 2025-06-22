@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"context"
 	"fmt"
 )
 
@@ -12,6 +13,8 @@ type Workflow struct {
 	marking      Marking
 	listeners    map[EventType][]interface{}
 	context      map[string]interface{}
+
+	manager *Manager // pointer to manager, may be nil
 }
 
 // NewWorkflow constructor
@@ -37,6 +40,7 @@ func NewWorkflow(name string, definition *Definition, initialPlace Place) (*Work
 		marking:      marking,
 		listeners:    make(map[EventType][]interface{}),
 		context:      make(map[string]interface{}),
+		manager:      nil,
 	}, nil
 }
 
@@ -78,8 +82,80 @@ func (w *Workflow) Context(key string) (interface{}, bool) {
 	return value, ok
 }
 
+// SetManager sets the manager pointer for this workflow
+func (w *Workflow) SetManager(m *Manager) {
+	w.manager = m
+}
+
+// fireEvent fires listeners from definition, manager, and instance (in that order)
+func (w *Workflow) fireEvent(event Event) error {
+	eventType := event.Type()
+
+	// 1. Definition listeners
+	if w.definition != nil && w.definition.Listeners != nil {
+		for _, l := range w.definition.Listeners[eventType] {
+			switch eventType {
+			case EventGuard:
+				if gl, ok := l.(GuardEventListener); ok {
+					if err := gl(event.(*GuardEvent)); err != nil {
+						return err
+					}
+				}
+			default:
+				if el, ok := l.(EventListener); ok {
+					if err := el(event); err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
+	// 2. Manager listeners
+	if w.manager != nil && w.manager.Listeners != nil {
+		for _, l := range w.manager.Listeners[eventType] {
+			switch eventType {
+			case EventGuard:
+				if gl, ok := l.(GuardEventListener); ok {
+					if err := gl(event.(*GuardEvent)); err != nil {
+						return err
+					}
+				}
+			default:
+				if el, ok := l.(EventListener); ok {
+					if err := el(event); err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
+	// 3. Instance listeners
+	for _, l := range w.listeners[eventType] {
+		switch eventType {
+		case EventGuard:
+			if gl, ok := l.(GuardEventListener); ok {
+				if err := gl(event.(*GuardEvent)); err != nil {
+					return err
+				}
+			}
+		default:
+			if el, ok := l.(EventListener); ok {
+				if err := el(event); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
 // Can check if transition to target places is possible
 func (w *Workflow) Can(to []Place) error {
+	return w.CanWithContext(context.Background(), to)
+}
+
+// CanWithContext checks if transition to target places is possible with a context
+func (w *Workflow) CanWithContext(ctx context.Context, to []Place) error {
 	// Check if transition is valid
 	if len(to) == 0 {
 		return ErrInvalidTransition
@@ -110,7 +186,7 @@ func (w *Workflow) Can(to []Place) error {
 			}
 			if matches {
 				// Create guard event for validation
-				event := NewGuardEvent(&t, w.marking.Places(), to, w, w.context)
+				event := NewGuardEvent(ctx, &t, w.marking.Places(), to, w)
 
 				// First, validate transition constraints
 				if err = t.validate(event); err != nil {
@@ -118,13 +194,11 @@ func (w *Workflow) Can(to []Place) error {
 				}
 
 				// Then, fire guard event listeners
-				for _, listener := range w.listeners[EventGuard] {
-					if err = listener.(GuardEventListener)(event); err != nil {
-						return err
-					}
-					if event.IsBlocking() {
-						return ErrTransitionNotAllowed
-					}
+				if err = w.fireEvent(event); err != nil {
+					return err
+				}
+				if event.IsBlocking() {
+					return ErrTransitionNotAllowed
 				}
 				return nil
 			}
@@ -136,6 +210,11 @@ func (w *Workflow) Can(to []Place) error {
 
 // Apply applies a transition to the workflow
 func (w *Workflow) Apply(targetPlaces []Place) error {
+	return w.ApplyWithContext(context.Background(), targetPlaces)
+}
+
+// ApplyWithContext applies a transition to the workflow with a context
+func (w *Workflow) ApplyWithContext(ctx context.Context, targetPlaces []Place) error {
 	// Validate target places
 	for _, place := range targetPlaces {
 		if !w.definition.Place(place) {
@@ -144,7 +223,7 @@ func (w *Workflow) Apply(targetPlaces []Place) error {
 	}
 
 	// Check if the transition is allowed
-	if err := w.Can(targetPlaces); err != nil {
+	if err := w.CanWithContext(ctx, targetPlaces); err != nil {
 		return err
 	}
 
@@ -193,11 +272,9 @@ func (w *Workflow) Apply(targetPlaces []Place) error {
 	}
 
 	// Fire before transition event
-	event := NewEvent(EventBeforeTransition, transition, from, targetPlaces, w, w.context)
-	for _, listener := range w.listeners[EventBeforeTransition] {
-		if err := listener.(EventListener)(event); err != nil {
-			return err
-		}
+	event := NewEvent(ctx, EventBeforeTransition, transition, from, targetPlaces, w)
+	if err := w.fireEvent(event); err != nil {
+		return err
 	}
 
 	// Remove the 'from' places from marking
@@ -220,11 +297,9 @@ func (w *Workflow) Apply(targetPlaces []Place) error {
 	w.marking.SetPlaces(newPlaces)
 
 	// Fire after transition event
-	event = NewEvent(EventAfterTransition, transition, from, targetPlaces, w, w.context)
-	for _, listener := range w.listeners[EventAfterTransition] {
-		if err := listener.(EventListener)(event); err != nil {
-			return err
-		}
+	event = NewEvent(ctx, EventAfterTransition, transition, from, targetPlaces, w)
+	if err := w.fireEvent(event); err != nil {
+		return err
 	}
 
 	return nil

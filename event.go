@@ -1,5 +1,9 @@
 package workflow
 
+import (
+	"context"
+)
+
 // EventType represents the type of workflow event
 type EventType string
 
@@ -19,7 +23,7 @@ type Event interface {
 	From() []Place
 	To() []Place
 	Workflow() *Workflow
-	Context(key string) (interface{}, bool)
+	Context() context.Context
 }
 
 // BaseEvent represents a workflow event
@@ -29,18 +33,19 @@ type BaseEvent struct {
 	from       []Place
 	to         []Place
 	workflow   *Workflow
-	context    map[string]interface{}
+
+	ctx context.Context
 }
 
 // NewEvent creates a new BaseEvent instance
-func NewEvent(eventType EventType, transition *Transition, from []Place, to []Place, workflow *Workflow, context map[string]interface{}) *BaseEvent {
+func NewEvent(ctx context.Context, eventType EventType, transition *Transition, from []Place, to []Place, workflow *Workflow) *BaseEvent {
 	return &BaseEvent{
 		eventType:  eventType,
 		transition: transition,
 		from:       from,
 		to:         to,
 		workflow:   workflow,
-		context:    context,
+		ctx:        ctx,
 	}
 }
 
@@ -69,10 +74,9 @@ func (e *BaseEvent) Workflow() *Workflow {
 	return e.workflow
 }
 
-// Context returns the value for the given key from the event context
-func (e *BaseEvent) Context(key string) (interface{}, bool) {
-	value, ok := e.context[key]
-	return value, ok
+// Context returns the context.Context for the event
+func (e *BaseEvent) Context() context.Context {
+	return e.ctx
 }
 
 // GuardEvent represents a guard event in the workflow
@@ -82,7 +86,7 @@ type GuardEvent struct {
 }
 
 // NewGuardEvent creates a new Guard Event instance
-func NewGuardEvent(transition *Transition, from []Place, to []Place, workflow *Workflow, context map[string]interface{}) *GuardEvent {
+func NewGuardEvent(ctx context.Context, transition *Transition, from []Place, to []Place, workflow *Workflow) *GuardEvent {
 	return &GuardEvent{
 		BaseEvent: BaseEvent{
 			eventType:  EventGuard,
@@ -90,7 +94,7 @@ func NewGuardEvent(transition *Transition, from []Place, to []Place, workflow *W
 			from:       from,
 			to:         to,
 			workflow:   workflow,
-			context:    context,
+			ctx:        ctx,
 		},
 		isBlocking: false,
 	}

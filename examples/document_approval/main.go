@@ -88,8 +88,8 @@ func main() {
 
 	// Add guard event listener
 	wf.AddGuardEventListener(func(event *workflow.GuardEvent) error {
-		ctxValue, ok := event.Context("document_context")
-		if !ok {
+		ctxValue, ok := event.Workflow().Context("document_context")
+		if ok && ctxValue == nil {
 			return fmt.Errorf("missing document context")
 		}
 		ctx, ok := ctxValue.(*DocumentContext)
@@ -112,7 +112,7 @@ func main() {
 
 	// Add event listeners
 	wf.AddEventListener(workflow.EventBeforeTransition, func(event workflow.Event) error {
-		ctxValue, ok := event.Context("document_context")
+		ctxValue, ok := event.Workflow().Context("document_context")
 		if !ok {
 			return fmt.Errorf("missing document context")
 		}
@@ -133,7 +133,7 @@ func main() {
 	})
 
 	wf.AddEventListener(workflow.EventAfterTransition, func(event workflow.Event) error {
-		ctxValue, ok := event.Context("document_context")
+		ctxValue, ok := event.Workflow().Context("document_context")
 		if !ok {
 			return fmt.Errorf("missing document context")
 		}

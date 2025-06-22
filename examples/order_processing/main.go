@@ -284,7 +284,7 @@ func (p *PaymentProcessor) ProcessPayment(amount float64) bool {
 }
 
 // handlePaymentProcessing handles payment processing logic
-func handlePaymentProcessing(wf *workflow.Workflow, processor *PaymentProcessor) error {
+func handlePaymentProcessing(wf *workflow.Workflow, _ *PaymentProcessor) error {
 	if amountValue, ok := wf.Context("order_amount"); ok {
 		if amount, ok := amountValue.(float64); ok {
 			log.Printf("Processing payment for amount: $%.2f", amount)
@@ -294,7 +294,7 @@ func handlePaymentProcessing(wf *workflow.Workflow, processor *PaymentProcessor)
 }
 
 // handleInventoryCheck handles inventory checking logic
-func handleInventoryCheck(wf *workflow.Workflow, inventory *Inventory) error {
+func handleInventoryCheck(wf *workflow.Workflow, _ *Inventory) error {
 	if orderValue, ok := wf.Context("order"); ok {
 		if order, ok := orderValue.(*Order); ok {
 			log.Printf("Checking inventory for %d items", len(order.Items))
