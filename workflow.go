@@ -3,6 +3,7 @@ package workflow
 import (
 	"context"
 	"fmt"
+	"sync"
 )
 
 // Workflow represents a workflow instance
@@ -15,6 +16,7 @@ type Workflow struct {
 	context      map[string]interface{}
 
 	manager *Manager // pointer to manager, may be nil
+	mu      sync.RWMutex
 }
 
 // NewWorkflow constructor
@@ -46,22 +48,30 @@ func NewWorkflow(name string, definition *Definition, initialPlace Place) (*Work
 
 // Name returns the workflow name
 func (w *Workflow) Name() string {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
 	return w.name
 }
 
 // AddEventListener adds an event listener for a specific event type
 func (w *Workflow) AddEventListener(eventType EventType, listener EventListener) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	w.listeners[eventType] = append(w.listeners[eventType], listener)
 }
 
 // AddGuardEventListener adds a guard event listener
 func (w *Workflow) AddGuardEventListener(listener GuardEventListener) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	eventType := EventGuard
 	w.listeners[eventType] = append(w.listeners[eventType], listener)
 }
 
 // RemoveEventListener removes an event listener
 func (w *Workflow) RemoveEventListener(eventType EventType, listener interface{}) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	listeners := w.listeners[eventType]
 	for i, l := range listeners {
 		if &l == &listener {
@@ -73,22 +83,29 @@ func (w *Workflow) RemoveEventListener(eventType EventType, listener interface{}
 
 // SetContext sets a value in the workflow context
 func (w *Workflow) SetContext(key string, value interface{}) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	w.context[key] = value
 }
 
 // Context returns the value for the given key from the workflow context
 func (w *Workflow) Context(key string) (interface{}, bool) {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
 	value, ok := w.context[key]
 	return value, ok
 }
 
 // SetManager sets the manager pointer for this workflow
 func (w *Workflow) SetManager(m *Manager) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	w.manager = m
 }
 
 // fireEvent fires listeners from definition, manager, and instance (in that order)
 func (w *Workflow) fireEvent(event Event) error {
+	// Do not hold lock while calling user listeners to avoid deadlocks
 	eventType := event.Type()
 
 	// 1. Definition listeners
@@ -111,8 +128,11 @@ func (w *Workflow) fireEvent(event Event) error {
 		}
 	}
 	// 2. Manager listeners
-	if w.manager != nil && w.manager.Listeners != nil {
-		for _, l := range w.manager.Listeners[eventType] {
+	w.mu.RLock()
+	manager := w.manager
+	w.mu.RUnlock()
+	if manager != nil && manager.Listeners != nil {
+		for _, l := range manager.Listeners[eventType] {
 			switch eventType {
 			case EventGuard:
 				if gl, ok := l.(GuardEventListener); ok {
@@ -129,8 +149,10 @@ func (w *Workflow) fireEvent(event Event) error {
 			}
 		}
 	}
-	// 3. Instance listeners
-	for _, l := range w.listeners[eventType] {
+	w.mu.RLock()
+	listeners := w.listeners[eventType]
+	w.mu.RUnlock()
+	for _, l := range listeners {
 		switch eventType {
 		case EventGuard:
 			if gl, ok := l.(GuardEventListener); ok {
@@ -156,6 +178,9 @@ func (w *Workflow) Can(to []Place) error {
 
 // CanWithContext checks if transition to target places is possible with a context
 func (w *Workflow) CanWithContext(ctx context.Context, to []Place) error {
+	w.mu.RLock()
+	definition := w.definition
+	w.mu.RUnlock()
 	// Check if transition is valid
 	if len(to) == 0 {
 		return ErrInvalidTransition
@@ -163,7 +188,7 @@ func (w *Workflow) CanWithContext(ctx context.Context, to []Place) error {
 
 	// Validate that all target places exist in workflow places
 	for _, place := range to {
-		if !w.definition.Place(place) {
+		if !definition.Place(place) {
 			return ErrInvalidPlace
 		}
 	}
@@ -215,17 +240,20 @@ func (w *Workflow) Apply(targetPlaces []Place) error {
 
 // ApplyWithContext applies a transition to the workflow with a context
 func (w *Workflow) ApplyWithContext(ctx context.Context, targetPlaces []Place) error {
-	// Validate target places
+	// Validate target places first (before locking)
 	for _, place := range targetPlaces {
 		if !w.definition.Place(place) {
 			return ErrInvalidPlace
 		}
 	}
 
-	// Check if the transition is allowed
+	// Check if the transition is allowed (before locking)
 	if err := w.CanWithContext(ctx, targetPlaces); err != nil {
 		return err
 	}
+
+	w.mu.Lock()
+	defer w.mu.Unlock()
 
 	// Find the transition that leads to these places
 	var from []Place
@@ -271,11 +299,14 @@ func (w *Workflow) ApplyWithContext(ctx context.Context, targetPlaces []Place) e
 		return ErrInvalidTransition
 	}
 
-	// Fire before transition event
+	// Fire before transition event (unlock before calling listeners)
+	w.mu.Unlock()
 	event := NewEvent(ctx, EventBeforeTransition, transition, from, targetPlaces, w)
 	if err := w.fireEvent(event); err != nil {
+		w.mu.Lock()
 		return err
 	}
+	w.mu.Lock()
 
 	// Remove the 'from' places from marking
 	newPlaces := make([]Place, 0, len(currentPlaces))
@@ -296,17 +327,22 @@ func (w *Workflow) ApplyWithContext(ctx context.Context, targetPlaces []Place) e
 	newPlaces = append(newPlaces, targetPlaces...)
 	w.marking.SetPlaces(newPlaces)
 
-	// Fire after transition event
+	// Fire after transition event (unlock before calling listeners)
+	w.mu.Unlock()
 	event = NewEvent(ctx, EventAfterTransition, transition, from, targetPlaces, w)
 	if err := w.fireEvent(event); err != nil {
+		w.mu.Lock()
 		return err
 	}
+	w.mu.Lock()
 
 	return nil
 }
 
 // EnabledTransitions returns all transitions that can be applied in the current place
 func (w *Workflow) EnabledTransitions() ([]Transition, error) {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
 	var enabled []Transition
 	currentPlaces := w.marking.Places()
 
@@ -337,21 +373,29 @@ func (w *Workflow) EnabledTransitions() ([]Transition, error) {
 
 // CurrentPlaces returns the current places of the workflow
 func (w *Workflow) CurrentPlaces() []Place {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
 	return w.marking.Places()
 }
 
 // Definition returns the workflow definition
 func (w *Workflow) Definition() *Definition {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
 	return w.definition
 }
 
 // Marking returns the current marking of the workflow
 func (w *Workflow) Marking() Marking {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
 	return w.marking
 }
 
 // SetMarking sets the workflow marking
 func (w *Workflow) SetMarking(marking Marking) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	if marking == nil {
 		return fmt.Errorf("marking cannot be nil")
 	}
@@ -361,5 +405,7 @@ func (w *Workflow) SetMarking(marking Marking) error {
 
 // InitialPlace returns the initial place of the workflow
 func (w *Workflow) InitialPlace() Place {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
 	return w.initialPlace
 }
