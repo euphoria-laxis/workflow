@@ -1,5 +1,7 @@
 # Go Workflow
 
+> **Note:** This workflow engine is still under active development and is **not yet production-ready**. Community contributions, feedback, and real-world adoption are needed to help mature the project and ensure its stability for production use. If you're interested in contributing or trying it out, please check out the [GitHub repository](https://github.com/ehabterra/workflow) and get involved!
+
 A flexible and extensible workflow engine for Go applications. This package provides a robust implementation of a Petri net-based workflow system that supports complex state transitions, event handling, and constraints. Inspired by [Symfony Workflow Component](https://symfony.com/doc/current/workflow.html).
 
 ## Features
