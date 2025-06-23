@@ -4,16 +4,6 @@ import (
 	"fmt"
 )
 
-// Storage defines the interface for workflow state persistence
-type Storage interface {
-	// LoadState loads the workflow state for a given ID
-	LoadState(id string) ([]Place, error)
-	// SaveState saves the workflow state for a given ID
-	SaveState(id string, places []Place) error
-	// DeleteState removes the workflow state for a given ID
-	DeleteState(id string) error
-}
-
 // Manager handles workflow instances and their persistence
 type Manager struct {
 	registry *Registry
@@ -39,8 +29,8 @@ func (m *Manager) LoadWorkflow(id string, definition *Definition) (*Workflow, er
 		return wf, nil
 	}
 
-	// Load state from storage
-	places, err := m.storage.LoadState(id)
+	// Load state and context from storage
+	places, wfContext, err := m.storage.LoadState(id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load workflow state: %w", err)
 	}
@@ -51,6 +41,7 @@ func (m *Manager) LoadWorkflow(id string, definition *Definition) (*Workflow, er
 		return nil, fmt.Errorf("failed to create workflow: %w", err)
 	}
 	wf.SetManager(m)
+	wf.context = wfContext // Set the loaded context
 
 	// Set the current marking
 	wf.Marking().SetPlaces(places)
@@ -62,7 +53,7 @@ func (m *Manager) LoadWorkflow(id string, definition *Definition) (*Workflow, er
 
 // SaveWorkflow saves a workflow instance state to storage
 func (m *Manager) SaveWorkflow(id string, wf *Workflow) error {
-	return m.storage.SaveState(id, wf.Marking().Places())
+	return m.storage.SaveState(id, wf.Marking().Places(), wf.context)
 }
 
 // GetWorkflow gets a workflow instance from the registry or loads it from storage
@@ -86,7 +77,7 @@ func (m *Manager) CreateWorkflow(id string, definition *Definition, initialPlace
 	wf.SetManager(m)
 
 	// Save initial state
-	if err := m.storage.SaveState(id, []Place{initialPlace}); err != nil {
+	if err := m.storage.SaveState(id, wf.Marking().Places(), wf.context); err != nil {
 		return nil, fmt.Errorf("failed to save initial state: %w", err)
 	}
 

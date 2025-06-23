@@ -105,3 +105,13 @@ func (t *Transition) validate(event Event) error {
 	}
 	return nil
 }
+
+// MustNewTransition is a helper that creates a new transition and panics on error.
+// This is useful for defining transitions in a declarative way.
+func MustNewTransition(name string, from []Place, to []Place) *Transition {
+	t, err := NewTransition(name, from, to)
+	if err != nil {
+		panic(err)
+	}
+	return t
+}

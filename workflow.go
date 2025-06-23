@@ -19,6 +19,20 @@ type Workflow struct {
 	mu      sync.RWMutex
 }
 
+// Storage defines the interface for persisting workflow state.
+// It is responsible for loading and saving the workflow's places (state)
+// and its context data (custom fields).
+type Storage interface {
+	// LoadState loads the workflow's places and its context data for the given ID.
+	LoadState(id string) (places []Place, context map[string]interface{}, err error)
+
+	// SaveState saves the workflow's places and its context data for the given ID.
+	SaveState(id string, places []Place, context map[string]interface{}) error
+
+	// DeleteState removes the workflow state for the given ID.
+	DeleteState(id string) error
+}
+
 // NewWorkflow constructor
 func NewWorkflow(name string, definition *Definition, initialPlace Place) (*Workflow, error) {
 	if name == "" {

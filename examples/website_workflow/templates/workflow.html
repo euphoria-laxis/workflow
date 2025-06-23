@@ -17,121 +17,48 @@
             <div class="flex justify-between items-start mb-6">
                 <div>
                     <h2 class="text-2xl font-semibold">{{.Title}}</h2>
-                    <p class="text-gray-600 mt-2">{{.Description}}</p>
+                    <p class="text-gray-600 mt-2">ID: {{.ID}}</p>
                 </div>
-                <span class="px-3 py-1 rounded-full text-sm font-medium {{if eq .State "draft"}}bg-gray-200{{else if eq .State "review"}}bg-yellow-200{{else if eq .State "approved"}}bg-green-200{{else}}bg-blue-200{{end}}">
-                    {{.State}}
-                </span>
             </div>
 
             <div class="border-t pt-6">
-                <h3 class="text-lg font-medium mb-4">Notes</h3>
-                <textarea id="notes" rows="4" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">{{.Notes}}</textarea>
-                <button onclick="updateNotes()" class="mt-2 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Save Notes</button>
+                <h3 class="text-lg font-medium mb-4">Content</h3>
+                <div class="bg-gray-50 p-4 rounded">{{.Content}}</div>
             </div>
 
             <div class="border-t mt-6 pt-6">
                 <h3 class="text-lg font-medium mb-4">Available Actions</h3>
-                <div id="actions" class="space-x-4">
-                    {{if eq .State "draft"}}
-                    <button onclick="transition('review')" class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600">Submit for Review</button>
-                    {{else if eq .State "review"}}
-                    <button onclick="transition('draft')" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Request Changes</button>
-                    <button onclick="transition('approved')" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Approve</button>
-                    {{else if eq .State "approved"}}
-                    <button onclick="transition('published')" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Publish</button>
+                <div class="space-y-2">
+                    {{range .Transitions}}
+                    <form action="/workflow/{{$.ID}}" method="post" class="flex items-center space-x-2">
+                        <input type="hidden" name="action" value="{{.Name}}">
+                        <input type="text" name="notes" placeholder="Notes (optional)" class="rounded border px-2 py-1 text-sm">
+                        <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">{{.Name}}</button>
+                    </form>
                     {{end}}
                 </div>
             </div>
 
             <div class="border-t mt-6 pt-6">
                 <h3 class="text-lg font-medium mb-4">Transition History</h3>
-                <div id="history" class="space-y-4">
-                    <!-- History will be loaded here -->
+                <div class="space-y-2">
+                    {{range .History}}
+                    <div class="border rounded p-3 bg-gray-50">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <div class="text-sm text-gray-700">From: <b>{{.FromState}}</b> → To: <b>{{.ToState}}</b></div>
+                                <div class="text-sm text-gray-700">Transition: <b>{{.Transition}}</b></div>
+                                {{if .Notes}}<div class="text-sm text-gray-500 mt-1">Notes: {{.Notes}}</div>{{end}}
+                            </div>
+                            <div class="text-xs text-gray-400">{{.CreatedAt}}</div>
+                        </div>
+                    </div>
+                    {{else}}
+                    <div class="text-gray-400">No history yet.</div>
+                    {{end}}
                 </div>
             </div>
         </div>
     </div>
-
-    <script>
-        async function updateNotes() {
-            const notes = document.getElementById('notes').value;
-            try {
-                const response = await fetch('/api/workflows/{{.ID}}', {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        title: '{{.Title}}',
-                        description: '{{.Description}}',
-                        notes: notes
-                    })
-                });
-
-                if (response.ok) {
-                    alert('Notes updated successfully');
-                } else {
-                    alert('Failed to update notes');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Failed to update notes');
-            }
-        }
-
-        async function loadHistory() {
-            try {
-                const response = await fetch('/api/workflows/{{.ID}}/history');
-                if (response.ok) {
-                    const history = await response.json();
-                    const historyHtml = history.map(h => `
-                        <div class="border rounded-lg p-4">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <p class="text-sm text-gray-600">From: ${h.from_state} → To: ${h.to_state}</p>
-                                    <p class="text-sm text-gray-600">Transition: ${h.transition}</p>                                   
-                                    ${h.notes ? `<p class="text-sm text-gray-600 mt-2">${h.notes}</p>` : ''}
-                                </div>
-                                <span class="text-xs text-gray-500">${new Date(h.created_at).toLocaleString()}</span>
-                            </div>
-                        </div>
-                    `).join('');
-                    document.getElementById('history').innerHTML = historyHtml;
-                }
-            } catch (error) {
-                console.error('Error loading history:', error);
-            }
-        }
-
-        async function transition(targetState) {
-            const notes = prompt('Add transition notes (optional):');
-            try {
-                const response = await fetch('/api/workflows/{{.ID}}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        transition: targetState,
-                        notes: notes
-                    })
-                });
-
-                if (response.ok) {
-                    window.location.reload();
-                } else {
-                    const error = await response.text();
-                    alert('Failed to transition: ' + error);
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Failed to transition');
-            }
-        }
-
-        // Load history when page loads
-        loadHistory();
-    </script>
 </body>
 </html> 

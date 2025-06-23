@@ -7,29 +7,41 @@ import (
 
 // MockStorage implements the Storage interface for testing
 type MockStorage struct {
-	states map[string][]Place
+	states   map[string][]Place
+	contexts map[string]map[string]interface{}
 }
 
 func NewMockStorage() *MockStorage {
 	return &MockStorage{
-		states: make(map[string][]Place),
+		states:   make(map[string][]Place),
+		contexts: make(map[string]map[string]interface{}),
 	}
 }
 
-func (m *MockStorage) LoadState(id string) ([]Place, error) {
-	if states, ok := m.states[id]; ok {
-		return states, nil
+func (m *MockStorage) LoadState(id string) ([]Place, map[string]interface{}, error) {
+	states, ok := m.states[id]
+	if !ok {
+		return nil, nil, fmt.Errorf("workflow not found")
 	}
-	return nil, fmt.Errorf("workflow not found")
+	ctx := m.contexts[id]
+	if ctx == nil {
+		ctx = map[string]interface{}{}
+	}
+	return states, ctx, nil
 }
 
-func (m *MockStorage) SaveState(id string, places []Place) error {
+func (m *MockStorage) SaveState(id string, places []Place, context map[string]interface{}) error {
 	m.states[id] = places
+	if context == nil {
+		context = map[string]interface{}{}
+	}
+	m.contexts[id] = context
 	return nil
 }
 
 func (m *MockStorage) DeleteState(id string) error {
 	delete(m.states, id)
+	delete(m.contexts, id)
 	return nil
 }
 
@@ -81,7 +93,7 @@ func TestManager_CreateWorkflow(t *testing.T) {
 	}
 
 	// Verify initial state was saved
-	states, err := storage.LoadState(id)
+	states, _, err := storage.LoadState(id)
 	if err != nil {
 		t.Errorf("Failed to load workflow state: %v", err)
 	}
@@ -157,7 +169,7 @@ func TestManager_SaveWorkflow(t *testing.T) {
 	}
 
 	// Verify the state was saved
-	states, err := storage.LoadState(id)
+	states, _, err := storage.LoadState(id)
 	if err != nil {
 		t.Errorf("Failed to load workflow state: %v", err)
 	}
@@ -199,7 +211,7 @@ func TestManager_DeleteWorkflow(t *testing.T) {
 	}
 
 	// Verify workflow state was removed from storage
-	_, err = storage.LoadState(id)
+	_, _, err = storage.LoadState(id)
 	if err == nil {
 		t.Error("Expected error when getting deleted workflow from storage")
 	}
@@ -226,7 +238,7 @@ func TestManager_LoadWorkflow(t *testing.T) {
 	// Create a workflow and save its state
 	id := "test_workflow"
 	initialPlace := Place("draft")
-	err = storage.SaveState(id, []Place{initialPlace})
+	err = storage.SaveState(id, []Place{initialPlace}, nil)
 	if err != nil {
 		t.Fatalf("Failed to save workflow state: %v", err)
 	}
