@@ -11,9 +11,102 @@ A flexible and extensible workflow engine for Go applications. This package prov
 - Thread-safe workflow registry
 - Comprehensive test coverage
 - Mermaid diagram generation for visualization
-- Flexible storage interface for workflow persistence
+- **Flexible, context-aware storage interface for workflow persistence**
+- **Options pattern for custom fields and schema generation**
+- **Reusable, pluggable history/audit layer with pagination and filtering**
 - Workflow manager for lifecycle management
 - Support for parallel transitions and branching
+
+## Storage Layer (New)
+
+The storage layer is now fully context-aware and supports custom fields via the options pattern. Only fields declared as custom fields are persisted.
+
+### Storage Interface
+
+The package provides a flexible, context-aware storage interface for persisting workflow states and custom fields:
+
+```go
+type Storage interface {
+    LoadState(id string) (places []Place, context map[string]interface{}, err error)
+    SaveState(id string, places []Place, context map[string]interface{}) error
+    DeleteState(id string) error
+}
+```
+
+You can implement your own storage backend by implementing this interface. The package includes a SQLite implementation with options for custom fields:
+
+```go
+import "github.com/ehabterra/workflow/storage"
+
+// Create a SQLite storage with custom fields
+storage, err := storage.NewSQLiteStorage(db,
+    storage.WithTable("workflow_states"),
+    storage.WithCustomFields(map[string]string{
+        "title": "title TEXT",
+        "owner": "owner TEXT",
+    }),
+)
+if err != nil { panic(err) }
+
+// Generate and initialize schema
+schema := storage.GenerateSchema()
+if err := storage.Initialize(db, schema); err != nil { panic(err) }
+
+// Save state with context
+err = storage.SaveState("my-workflow", []workflow.Place{"draft"}, map[string]interface{}{"title": "My Doc", "owner": "alice"})
+
+// Load state and context
+places, ctx, err := storage.LoadState("my-workflow")
+fmt.Println(places, ctx["title"], ctx["owner"])
+```
+
+## History Layer (New)
+
+The history layer is reusable, pluggable, and supports custom fields, pagination, and filtering.
+
+### History Interface
+
+```go
+type HistoryStore interface {
+    SaveTransition(record *TransitionRecord) error
+    ListHistory(workflowID string, opts QueryOptions) ([]TransitionRecord, error)
+    GenerateSchema() string
+    Initialize() error
+}
+```
+
+### SQLite History Example
+
+```go
+import "github.com/ehabterra/workflow/history"
+
+historyStore := history.NewSQLiteHistory(db,
+    history.WithCustomFields(map[string]string{
+        "ip_address": "ip_address TEXT",
+    }),
+)
+historyStore.Initialize()
+
+// Save a transition with custom fields
+historyStore.SaveTransition(&history.TransitionRecord{
+    WorkflowID: "wf1",
+    FromState:  "draft",
+    ToState:    "review",
+    Transition: "submit",
+    Notes:      "Submitted for review",
+    Actor:      "alice",
+    CreatedAt:  time.Now(),
+    CustomFields: map[string]interface{}{
+        "ip_address": "127.0.0.1",
+    },
+})
+
+// List history with pagination
+records, err := historyStore.ListHistory("wf1", history.QueryOptions{Limit: 10, Offset: 0})
+for _, rec := range records {
+    fmt.Println(rec.FromState, rec.ToState, rec.Notes, rec.CustomFields["ip_address"])
+}
+```
 
 ## Feature Checklist
 
@@ -154,28 +247,6 @@ err = manager.DeleteWorkflow("my-workflow")
 if err != nil {
     panic(err)
 }
-```
-
-### Storage Interface
-
-The package provides a flexible storage interface for persisting workflow states:
-
-```go
-type Storage interface {
-    LoadState(id string) ([]Place, error)
-    SaveState(id string, places []Place) error
-    DeleteState(id string) error
-}
-```
-
-You can implement your own storage backend by implementing this interface. The package includes a SQLite implementation:
-
-```go
-// Create a SQLite storage
-storage := workflow.NewSQLiteStorage("workflows.db")
-
-// Use it with the workflow manager
-manager := workflow.NewManager(registry, storage)
 ```
 
 ### Adding Constraints
