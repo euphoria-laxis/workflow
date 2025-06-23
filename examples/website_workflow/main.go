@@ -314,23 +314,3 @@ func listWorkflowsHelper() []string {
 	}
 	return ids
 }
-
-func loadTransitionHistory(workflowID string) ([]TransitionHistory, error) {
-	rows, err := db.Query(
-		`SELECT from_state, to_state, transition, notes, created_at FROM transition_history WHERE workflow_id = ? ORDER BY id DESC`,
-		workflowID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var history []TransitionHistory
-	for rows.Next() {
-		var h TransitionHistory
-		if err := rows.Scan(&h.FromState, &h.ToState, &h.Transition, &h.Notes, &h.CreatedAt); err != nil {
-			return nil, err
-		}
-		history = append(history, h)
-	}
-	return history, nil
-}
