@@ -127,8 +127,9 @@ for _, rec := range records {
 - [x] SQLite storage implementation
 - [x] Support for parallel transitions and branching
 - [x] Workflow history and audit trail (in examples)
-- [x] Web interface for workflow management (in examples)
-- [x] REST API endpoints (in examples)
+- [x] Web UI for workflow management (in examples)
+
+> **Note:** The provided example includes a Web UI for workflow management, but does **not** expose a REST API. If you need a REST API, contributions or feature requests are welcome!
 
 ### Planned Features 🚀
 
