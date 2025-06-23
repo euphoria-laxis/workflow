@@ -153,56 +153,65 @@ go get github.com/ehabterra/workflow
 
 ## Quick Start
 
-Here's a simple example of how to use the workflow package:
+Here's a simple example of how to use the workflow package with the new context-aware storage and options pattern:
 
 ```go
 package main
 
 import (
+    "database/sql"
     "fmt"
-    "github.com/ehabterra/workflow/workflow"
+    "time"
+
+    "github.com/ehabterra/workflow"
+    "github.com/ehabterra/workflow/storage"
+    _ "github.com/mattn/go-sqlite3"
 )
 
 func main() {
-    // Create a workflow definition
+    // Open SQLite DB (in-memory for demo)
+    db, err := sql.Open("sqlite3", ":memory:")
+    if err != nil { panic(err) }
+
+    // Create storage with custom fields
+    store, err := storage.NewSQLiteStorage(db,
+        storage.WithTable("workflow_states"),
+        storage.WithCustomFields(map[string]string{
+            "title": "title TEXT",
+        }),
+    )
+    if err != nil { panic(err) }
+    if err := storage.Initialize(db, store.GenerateSchema()); err != nil { panic(err) }
+
+    // Define workflow
     definition, err := workflow.NewDefinition(
-        []workflow.State{"start", "middle", "end"},
-		[]workflow.Transition{
-			func() workflow.Transition {
-				tr, _ := workflow.NewTransition("to-middle", []workflow.State{"start"}, []workflow.State{"middle"})
-				return *tr
-			}(),
-			func() workflow.Transition {
-				tr, _ := workflow.NewTransition("to-end", []workflow.State{"middle"}, []workflow.State{"end"})
-				return *tr
-			}(),
+        []workflow.Place{"start", "middle", "end"},
+        []workflow.Transition{
+            *workflow.MustNewTransition("to-middle", []workflow.Place{"start"}, []workflow.Place{"middle"}),
+            *workflow.MustNewTransition("to-end", []workflow.Place{"middle"}, []workflow.Place{"end"}),
         },
     )
-    if err != nil {
-        panic(err)
-    }
+    if err != nil { panic(err) }
 
-    // Create a new workflow
-    wf, err := workflow.NewWorkflow("my-workflow", definition, "start")
-    if err != nil {
-        panic(err)
-    }
+    // Create manager
+    registry := workflow.NewRegistry()
+    manager := workflow.NewManager(registry, store)
 
-    // Add event listeners
-    wf.AddEventListener(workflow.EventBeforeTransition, func(event workflow.Event) error {
-        fmt.Printf("Before transition: %s\n", event.Transition.Name)
-        return nil
-    })
+    // Create a new workflow with context
+    wf, err := manager.CreateWorkflow("my-workflow", definition, "start")
+    if err != nil { panic(err) }
+    wf.SetContext("title", "My Example Workflow")
+    if err := manager.SaveWorkflow("my-workflow", wf); err != nil { panic(err) }
 
-    // Apply transitions
-    err = wf.Apply([]workflow.State{"middle"})
-    if err != nil {
-        panic(err)
-    }
+    // Apply a transition
+    err = wf.Apply([]workflow.Place{"middle"})
+    if err != nil { panic(err) }
+    if err := manager.SaveWorkflow("my-workflow", wf); err != nil { panic(err) }
 
-    // Get current states
-    states := wf.CurrentStates()
-    fmt.Printf("Current states: %v\n", states)
+    // Load workflow and context from storage
+    loadedPlaces, loadedCtx, err := store.LoadState("my-workflow")
+    if err != nil { panic(err) }
+    fmt.Printf("Current places: %v, Title: %v\n", loadedPlaces, loadedCtx["title"])
 
     // Generate and print the workflow diagram
     diagram := wf.Diagram()
