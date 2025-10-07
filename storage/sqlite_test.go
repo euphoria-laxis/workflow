@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/ehabterra/workflow"
+	"github.com/euphoria-laxis/workflow"
 	_ "github.com/mattn/go-sqlite3"
 )
 

@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/ehabterra/workflow"
+	"github.com/euphoria-laxis/workflow"
 )
 
 func TestNewRegistry(t *testing.T) {

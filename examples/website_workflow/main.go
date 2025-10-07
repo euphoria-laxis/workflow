@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ehabterra/workflow"
-	"github.com/ehabterra/workflow/history"
-	"github.com/ehabterra/workflow/storage"
+	"github.com/euphoria-laxis/workflow"
+	"github.com/euphoria-laxis/workflow/history"
+	"github.com/euphoria-laxis/workflow/storage"
 	_ "github.com/mattn/go-sqlite3"
 )
 

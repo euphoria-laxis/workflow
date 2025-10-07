@@ -6,7 +6,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/ehabterra/workflow"
+	"github.com/euphoria-laxis/workflow"
 )
 
 // Order represents an order in the system

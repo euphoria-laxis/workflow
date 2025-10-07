@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/ehabterra/workflow"
+	"github.com/euphoria-laxis/workflow"
 )
 
 func main() {

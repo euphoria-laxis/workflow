@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ehabterra/workflow"
+	"github.com/euphoria-laxis/workflow"
 )
 
 // SQLiteStorage provides a persistent storage implementation using SQLite.

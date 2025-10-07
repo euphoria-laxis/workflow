@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/ehabterra/workflow"
+	"github.com/euphoria-laxis/workflow"
 )
 
 func BenchmarkNewWorkflow(b *testing.B) {

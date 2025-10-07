@@ -3,7 +3,7 @@ package workflow_test
 import (
 	"testing"
 
-	"github.com/ehabterra/workflow"
+	"github.com/euphoria-laxis/workflow"
 )
 
 func TestNewTransition(t *testing.T) {

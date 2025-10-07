@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ehabterra/workflow"
+	"github.com/euphoria-laxis/workflow"
 )
 
 // Document represents a document in the approval process
