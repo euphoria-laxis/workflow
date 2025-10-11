@@ -134,6 +134,9 @@ for _, rec := range records {
 ### Planned Features 🚀
 
 #### High Priority
+- [ ] MySQL support
+- [ ] Postgres support
+- [ ] Dynamic workflow definition loading
 - [ ] YAML/JSON configuration support
 - [ ] Standalone web interface for workflow management
 - [ ] Enhanced REST API endpoints
