@@ -41,7 +41,7 @@ type Storage interface {
 You can implement your own storage backend by implementing this interface. The package includes a SQLite implementation with options for custom fields:
 
 ```go
-import "github.com/ehabterra/workflow/storage"
+import "github.com/euphoria-laxis/workflow/storage"
 
 // Create a SQLite storage with custom fields
 storage, err := storage.NewSQLiteStorage(db,
@@ -83,7 +83,7 @@ type HistoryStore interface {
 ### SQLite History Example
 
 ```go
-import "github.com/ehabterra/workflow/history"
+import "github.com/euphoria-laxis/workflow/history"
 
 historyStore := history.NewSQLiteHistory(db,
     history.WithCustomFields(map[string]string{
@@ -154,7 +154,7 @@ for _, rec := range records {
 ## Installation
 
 ```bash
-go get github.com/ehabterra/workflow
+go get github.com/euphoria-laxis/workflow
 ```
 
 ## Quick Start
@@ -169,8 +169,8 @@ import (
     "fmt"
     "time"
 
-    "github.com/ehabterra/workflow"
-    "github.com/ehabterra/workflow/storage"
+    "github.com/euphoria-laxis/workflow"
+    "github.com/euphoria-laxis/workflow/storage"
     _ "github.com/mattn/go-sqlite3"
 )
 
